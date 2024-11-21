@@ -9,6 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
 ENV GUNICORN_WORKERS=4
 ENV APP_PORT=5000
+ENV BASE_URL=http://localhost:5000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
@@ -36,4 +37,4 @@ RUN uv venv /home/app/venv && \
     uv pip install gunicorn
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["gunicorn", "--workers=${GUNICORN_WORKERS}", "--bind=0.0.0.0:${APP_PORT}", "src.app:create_app()"]
+CMD ["sh", "-c", "gunicorn --workers $GUNICORN_WORKERS --bind 0.0.0.0:$APP_PORT 'src.app:create_app()'"]
