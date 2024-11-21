@@ -39,3 +39,15 @@ uv run ruff format --check && uv run ruff check
 ## Packaging
 
 voir package_scripts/main.sh
+
+## Fonctionnement
+
+Une fois l’app installée on peut vérifier qu’elle fonctionne avec :
+
+```sh
+curl -X POST \
+  http://localhost:5000/pdf \
+  -H "Content-Type: application/json" \
+  -d '{"html": "<html><body><h1>Test</h1></body></html>"}' \
+  --output test.pdf
+```

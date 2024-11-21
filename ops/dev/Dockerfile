@@ -5,15 +5,10 @@ ARG GROUP_ID=1000
 ARG USER_ID=1000
 
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PIP_NO_CACHE_DIR=1
-ENV GUNICORN_WORKERS=4
-ENV APP_PORT=5000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   ca-certificates \
-  tini \
   weasyprint \
   curl && rm -rf /var/lib/apt/lists/*
 
@@ -26,14 +21,9 @@ USER app
 
 WORKDIR /home/app
 
-COPY --chown=app:app src/ src/
-COPY --chown=app:app pyproject.toml .
-
+RUN uv venv /home/app/venv
 ENV PATH="/home/app/venv/bin:$PATH"
-RUN uv venv /home/app/venv && \
-    . /home/app/venv/bin/activate && \
-    uv pip install -e . && \
-    uv pip install gunicorn
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["gunicorn", "--workers=${GUNICORN_WORKERS}", "--bind=0.0.0.0:${APP_PORT}", "src.app:create_app()"]
+RUN uv pip install -e .
+
+CMD ["python3", "-m", "flask", "--app", "src.app:create_app()", "run", "--host=0.0.0.0"]
