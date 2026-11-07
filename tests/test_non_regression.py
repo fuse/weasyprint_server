@@ -30,7 +30,7 @@ class TestIntegrations(TestCase):
                 html = HTML(
                     string=string_html,
                     base_url=os.environ.get("BASE_URL"),
-                    url_fetcher=custom_url_fetcher,
+                    url_fetcher=custom_url_fetcher(),
                 )
 
                 pdf = html.write_pdf()

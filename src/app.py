@@ -4,6 +4,7 @@ from flask import Flask, request, make_response
 from werkzeug.exceptions import HTTPException
 from weasyprint import HTML
 import sentry_sdk
+from weasyprint.urls import FatalURLFetchingError
 from .custom_fetcher import custom_url_fetcher
 from .logger import ERROR_LOGGER, ACCESS_LOGGER
 import time
@@ -55,12 +56,11 @@ def create_app(test_config=None):
         html = HTML(
             string=string_html,
             base_url=app.config["BASE_URL"],
-            url_fetcher=custom_url_fetcher,
+            url_fetcher=custom_url_fetcher(),
         )
         try:
             generated_pdf = html.write_pdf()
-        # See the hack in custom_fetcher.py
-        except AttributeError:
+        except FatalURLFetchingError:
             sentry_sdk.capture_message("An asset is missing")
             return make_response({"error": "an asset is missing"}, 500)
 
@@ -110,7 +110,7 @@ def create_app(test_config=None):
                 html = HTML(
                     string=request_data["html"],
                     base_url=app.config["BASE_URL"],
-                    url_fetcher=custom_url_fetcher,
+                    url_fetcher=custom_url_fetcher(),
                 )
                 with open(pdf_file_path, "wb") as f:
                     f.write(html.write_pdf())

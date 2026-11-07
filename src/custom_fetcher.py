@@ -1,8 +1,8 @@
 import os
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from flask import current_app, has_app_context
-from weasyprint.urls import default_url_fetcher
+from weasyprint.urls import FatalURLFetchingError, URLFetcher
 from .logger import ERROR_LOGGER
 
 
@@ -32,20 +32,45 @@ def is_allowed_url(url, base_url):
     return scheme in ("http", "https") and (scheme, host, port) == _origin(base_url)
 
 
-def custom_url_fetcher(url, timeout=10, ssl_context=None):
-    if not is_allowed_url(url, _base_url()):
-        ERROR_LOGGER.warning("asset refused", extra={"context": {"url": url}})
-        # WeasyPrint logs and skips the resource: the PDF is generated without it.
-        raise ForbiddenURL(url)
+class SafeURLFetcher(URLFetcher):
+    """Fetcher that only follows inline data and assets served by BASE_URL.
 
-    try:
-        result = default_url_fetcher(url, timeout, ssl_context)
-    except URLError as e:
-        ERROR_LOGGER.warning(
-            "asset missing", exc_info=e, extra={"context": {"url": url}}
-        )
-        # Ugly hack:
-        # the caller swallows all `Exception`
-        # but raise an AttributeError if the result is None
-        result = None
-    return result
+    Redirects are disabled: a redirect from an allowed asset to another origin
+    would otherwise bypass the origin check.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("timeout", 10)
+        kwargs["allow_redirects"] = False
+        super().__init__(**kwargs)
+
+    def fetch(self, url, headers=None):
+        if not is_allowed_url(url, _base_url()):
+            ERROR_LOGGER.warning("asset refused", extra={"context": {"url": url}})
+            # WeasyPrint logs and skips the resource: the PDF is generated without it.
+            raise ForbiddenURL(url)
+        try:
+            return super().fetch(url, headers)
+        except HTTPError as e:
+            if 300 <= e.code < 400:
+                # Redirects are not followed: treated like a refused origin.
+                ERROR_LOGGER.warning(
+                    "asset redirect refused", extra={"context": {"url": url}}
+                )
+                raise ForbiddenURL(url) from e
+            ERROR_LOGGER.warning(
+                "asset missing", exc_info=e, extra={"context": {"url": url}}
+            )
+            raise FatalURLFetchingError(url) from e
+        except URLError as e:
+            ERROR_LOGGER.warning(
+                "asset missing", exc_info=e, extra={"context": {"url": url}}
+            )
+            # A missing asset of the allowed origin stops the rendering:
+            # the caller gets an error instead of an incomplete PDF.
+            raise FatalURLFetchingError(url) from e
+
+
+def custom_url_fetcher():
+    """A new fetcher per rendering (URLFetcher keeps per-request state)."""
+    return SafeURLFetcher()

@@ -1,6 +1,6 @@
 FROM debian:12-slim
 
-ARG UV_VERSION=0.5.4
+ARG UV_VERSION=0.8.14
 ARG GROUP_ID=1000
 ARG USER_ID=1000
 
@@ -28,12 +28,15 @@ USER app
 WORKDIR /home/app
 
 COPY --chown=app:app src/ src/
-COPY --chown=app:app pyproject.toml .
+COPY --chown=app:app pyproject.toml uv.lock ./
 
 ENV PATH="/home/app/venv/bin:$PATH"
+# Versions figées par uv.lock : une reconstruction de l'image ne dépend plus du cache ni de la date
 RUN uv venv /home/app/venv && \
     . /home/app/venv/bin/activate && \
-    uv pip install -e . && \
+    uv export --frozen --no-dev --no-emit-project --no-hashes -o /tmp/requirements.txt && \
+    uv pip install -r /tmp/requirements.txt && \
+    uv pip install --no-deps -e . && \
     uv pip install gunicorn
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
