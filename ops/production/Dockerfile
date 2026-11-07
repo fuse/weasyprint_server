@@ -31,13 +31,12 @@ COPY --chown=app:app src/ src/
 COPY --chown=app:app pyproject.toml uv.lock ./
 
 ENV PATH="/home/app/venv/bin:$PATH"
-# Versions figées par uv.lock : une reconstruction de l'image ne dépend plus du cache ni de la date
+# Versions et empreintes figées par uv.lock : installation vérifiée par hachage, indépendante du cache
 RUN uv venv /home/app/venv && \
     . /home/app/venv/bin/activate && \
-    uv export --frozen --no-dev --no-emit-project --no-hashes -o /tmp/requirements.txt && \
-    uv pip install -r /tmp/requirements.txt && \
-    uv pip install --no-deps -e . && \
-    uv pip install gunicorn
+    uv export --frozen --no-dev --no-emit-project -o /tmp/requirements.txt && \
+    uv pip install --require-hashes -r /tmp/requirements.txt && \
+    uv pip install --no-deps -e .
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["sh", "-c", "gunicorn --workers $GUNICORN_WORKERS --bind 0.0.0.0:$APP_PORT 'src.app:create_app()'"]
