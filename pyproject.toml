@@ -10,6 +10,7 @@ dependencies = [
   "flask",
   "sentry-sdk",
   "pyuwsgi",
+  "gunicorn",
 ]
 
 [tool.uv]

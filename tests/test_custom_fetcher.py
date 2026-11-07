@@ -15,6 +15,11 @@ CONTENT = b"ASSET-CONTENT"
 
 class AssetHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith("/redirect"):
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:{FORBIDDEN_PORT}/x")
+            self.end_headers()
+            return
         self.send_response(200)
         self.send_header("Content-type", "text/plain")
         self.end_headers()
@@ -118,3 +123,7 @@ class TestOriginRestriction(TestCase):
         response = self.post_pdf(html)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(any(CONTENT in s for s in embedded_streams(response.data)))
+
+    def test_redirection_vers_autre_origine_non_suivie(self):
+        html = f'<p><a rel="attachment" href="http://127.0.0.1:{ALLOWED_PORT}/redirect">pj</a></p>'
+        self.assert_content_absent(self.post_pdf(html))

@@ -1,6 +1,6 @@
 FROM debian:12-slim
 
-ARG UV_VERSION=0.5.4
+ARG UV_VERSION=0.8.14
 ARG GROUP_ID=1000
 ARG USER_ID=1000
 
@@ -28,13 +28,15 @@ USER app
 WORKDIR /home/app
 
 COPY --chown=app:app src/ src/
-COPY --chown=app:app pyproject.toml .
+COPY --chown=app:app pyproject.toml uv.lock ./
 
 ENV PATH="/home/app/venv/bin:$PATH"
+# Versions et empreintes figées par uv.lock : installation vérifiée par hachage, indépendante du cache
 RUN uv venv /home/app/venv && \
     . /home/app/venv/bin/activate && \
-    uv pip install -e . && \
-    uv pip install gunicorn
+    uv export --frozen --no-dev --no-emit-project -o /tmp/requirements.txt && \
+    uv pip install --require-hashes -r /tmp/requirements.txt && \
+    uv pip install --no-deps -e .
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["sh", "-c", "gunicorn --workers $GUNICORN_WORKERS --bind 0.0.0.0:$APP_PORT 'src.app:create_app()'"]
